@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>HTML5 LOTTO Canvas example</title>
+    <script type="text/javascript">
+      var DX            = 20;               // Box width
+      var DY            = 20;               //     height
+      var DX_SHIFT      = DX + 4;           // Box shift
+      var DY_SHIFT      = DY + 4;           //
+      var WIDTH         = 800;              // Canvas width
+      var HEIGHT        = 400;              //        height
+      var COLS          = 3;                // Columns in grid
+      var NUMS          = 34;               // Total Numbers 
+      var ROWS          = Math.ceil(NUMS/COLS);
+      var GRIDS         = 10;               // Total number of grids
+      var GRID_SHIFT_X  = COLS*DX_SHIFT + 5;
+      var GOFFX         = DX_SHIFT - 4;     // Grid offset
+      var GOFFY         = DY_SHIFT + 4;     //
+      var IN_X          = 2;
+      var IN_Y          = 2;
+      var QP_ROW        = ROWS + 2          // QuickPick
+      var QP_COL        = 1;                //
+      var QP_ID         = -1;               //
+      var V_ROW         = ROWS + 2          // VOID
+      var V_COL         = 2;                //
+      var V_ID          = -2;               //
+      var SLIMIT        = 17;               // complete system QP limit
+      var SIMPLE        = 7;                // simple column
+      var CGRID         = 'red';            // -- COLORS --
+      var CGRIDSEP      = '#ff4040';        // 
+      var CMARK         = '#0a0a0a';        //
+
+
+      // grid matrix of played numbers
+      var gnumbers = [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      ];
+      var qpicks = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];  // quickpicks per grid
+      var vmarks = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];  // void marks per grid
+
+      // ------------------------------------
+      // Handles the onmousedown event on the 
+      // canvas element
+      // ------------------------------------
+      function doSomething(e, o) {
+        var x = e.clientX-o.offsetLeft;
+        var y = e.clientY-o.offsetTop;
+        var gn = whichGridAndNumber(x, y);
+        var context = document.getElementById('the-canvas').getContext('2d');
+
+        if (gn.grid > 0 && gn.number > 0) { // regular mark on a number
+          gnumbers[gn.grid-1][gn.number-1] = 1 - gnumbers[gn.grid-1][gn.number-1];
+          drawNthGrid(context, gn.grid);
+        } else if (gn.grid > 0 && gn.number == QP_ID) {         // Make QP
+          qpicks[gn.grid-1] = 1 - qpicks[gn.grid-1];
+          drawNthGrid(context, gn.grid);
+          var h = countMarks(gn.grid);
+          if (qpicks[gn.grid-1] && h.count < 2) { // 0 or 1 mark
+            if (h.last_mark_index >= SLIMIT) {
+              alert("Your choice " + (h.last_mark_index + 1) + " exceeds system limit " + SLIMIT);
+            } else {
+              var k  = (h.count == 0 || h.last_mark_index < SIMPLE) ? SIMPLE : h.last_mark_index + 1;
+              nums = genQuickPick(k);
+              resetGrid(gn.grid);
+              for (var i=0; i < k; i++) { gnumbers[gn.grid-1][nums[i] - 1] = 1; } // set them with QP selection
+              // alert("QP total columns: " + combin(nums.length, SIMPLE));
+            }
+          } 
+          // always perform this: 
+          qpicks[gn.grid-1] = 0;
+          drawNthGrid(context, gn.grid);
+        } else if (gn.grid > 0 && gn.number == V_ID) {          // Make VOID
+          vmarks[gn.grid-1] = 1 - vmarks[gn.grid-1];
+          drawNthGrid(context, gn.grid);
+          resetGrid(gn.grid);
+          drawNthGrid(context, gn.grid);
+        }
+
+        // grid 
+        for (var grid=1; grid<=GRIDS; grid++) {
+          var h = checkGrid(grid);
+          
+          // status
+          document.getElementById("status"+grid).innerHTML = (h.is_ok) ? "OK" : "ERROR";
+
+          // message
+          document.getElementById("message"+grid).innerHTML = "<small>" + h.message + "</small>";
+
+          // numbers
+          document.getElementById("numbers"+grid).innerHTML = "<small>" + h.numbers.join(', ') + "</small>";
+
+          // columns
+          document.getElementById("columns"+grid).innerHTML = (h.is_ok) ? h.columns : "-";
+        }
+      }
+
+      // ----------------------
+      // draws the whole canvas 
+      // including the coupon
+      // ----------------------
+      function drawCanvas() {
+        var canvas = document.getElementById('the-canvas');
+        if (!canvas.getContext)
+          return ;
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = "black";
+        ctx.fillStyle = "white";
+        
+        ctx.strokeRect(0, 0, WIDTH, HEIGHT);
+        
+        drawCoupon(ctx);
+      }
+
+      // ---------------------
+      // Draws one grid where:  D R Y! ! !
+      // g = 1..10
+      // ---------------------
+      function drawNthGrid(ctx, g) {
+        var TX, TY;   // text displacement
+        var r, c;     // row, col handy vars
+        
+        g -= 1;
+
+        ctx.lineWidth = 1; // line width used for all elements
+
+        // the header rectangle
+        ctx.clearRect(GOFFX + g*GRID_SHIFT_X - 1, GOFFY - DY - 1, COLS*DX_SHIFT + 2, QP_ROW*DY_SHIFT + DY + 2);
+        ctx.fillStyle = CGRID;
+        ctx.strokeStyle = CGRID;
+        ctx.font = (DX/2)+"px Sans Serif";
+        ctx.strokeRect(GOFFX + g*GRID_SHIFT_X, GOFFY - DY_SHIFT + 4, (COLS - 1)*DX_SHIFT + DX, DY - 4);
+        TX = i < 9 ? DX/2 : DX/4; TY = 3*DY/4 - 2;
+        ctx.fillText(g + 1, GOFFX + g*GRID_SHIFT_X + Math.floor(COLS/2)*DX_SHIFT + TX, GOFFY - DY + TY);
+
+        // grid separator
+        if (g + 1 < GRIDS) {
+          ctx.strokeStyle = CGRIDSEP;
+          ctx.beginPath();
+          ctx.moveTo(GOFFX + g*GRID_SHIFT_X + COLS*DX_SHIFT, GOFFY);
+          ctx.lineTo(GOFFX + g*GRID_SHIFT_X + COLS*DX_SHIFT, GOFFY + QP_ROW*DY_SHIFT);
+          ctx.stroke();
+        }
+        for (var i=0; i < NUMS; i++) {
+          ctx.fillStyle = CGRID;
+          ctx.strokeStyle = CGRID;
+          ctx.font = (DX/2)+"px Sans Serif";
+
+          r = Math.floor(i/COLS);
+          c = i % COLS;
+          TX = i < 9 ? DX/2 : DX/4; TY = 3*DY/4;
+          ctx.strokeRect(GOFFX + g*GRID_SHIFT_X + c*DX_SHIFT, GOFFY + r*DY_SHIFT, DX, DY);
+          ctx.fillText(i + 1, GOFFX + g*GRID_SHIFT_X + c*DX_SHIFT + TX, GOFFY + r*DY_SHIFT + TY);
+          
+          if (gnumbers[g][i] == 1) {
+            ctx.strokeStyle = CMARK;
+            ctx.beginPath();
+            ctx.moveTo(GOFFX + g*GRID_SHIFT_X + c*DX_SHIFT + 4, GOFFY + r*DY_SHIFT + 4);
+            ctx.lineTo(GOFFX + g*GRID_SHIFT_X + c*DX_SHIFT + DX - 4, GOFFY + r*DY_SHIFT + DY - 4);
+            // ctx.stroke();
+            // ctx.beginPath();
+            ctx.moveTo(GOFFX + g*GRID_SHIFT_X + c*DX_SHIFT + DX - 4, GOFFY + r*DY_SHIFT + 4);
+            ctx.lineTo(GOFFX + g*GRID_SHIFT_X + c*DX_SHIFT + 4, GOFFY + r*DY_SHIFT + DY - 4);
+            ctx.stroke();
+          }
+        }
+        // QuickPick
+        ctx.fillStyle = CGRID;
+        ctx.strokeStyle = CGRID;
+        ctx.font = (DX/2)+"px Sans Serif";
+
+        TX = DX/4; TY = 3*DY/4;
+        ctx.strokeRect(GOFFX + g*GRID_SHIFT_X + (QP_COL - 1)*DX_SHIFT, GOFFY + (QP_ROW - 1)*DY_SHIFT, DX, DY);
+        ctx.fillText('QP', GOFFX + g*GRID_SHIFT_X + (QP_COL - 1)*DX_SHIFT + TX, GOFFY + (QP_ROW - 1)*DY_SHIFT + TY);
+
+        if (qpicks[g] == 1) {
+          ctx.strokeStyle = CMARK;
+          ctx.beginPath();
+          ctx.moveTo(GOFFX + g*GRID_SHIFT_X + (QP_COL - 1)*DX_SHIFT + 4,      GOFFY + (QP_ROW - 1)*DY_SHIFT + 4);
+          ctx.lineTo(GOFFX + g*GRID_SHIFT_X + (QP_COL - 1)*DX_SHIFT + DX - 4, GOFFY + (QP_ROW - 1)*DY_SHIFT + DY - 4);
+          // ctx.stroke();
+          // ctx.beginPath();
+          ctx.moveTo(GOFFX + g*GRID_SHIFT_X + (QP_COL - 1)*DX_SHIFT + DX - 4, GOFFY + (QP_ROW - 1)*DY_SHIFT + 4);
+          ctx.lineTo(GOFFX + g*GRID_SHIFT_X + (QP_COL - 1)*DX_SHIFT + 4,      GOFFY + (QP_ROW - 1)*DY_SHIFT + DY - 4);
+          ctx.stroke();
+        }
+
+        // Void Mark
+        ctx.fillStyle = CGRID;
+        ctx.strokeStyle = CGRID;
+        ctx.font = (DX/2)+"px Sans Serif";
+
+        TX = DX/2; TY = 3*DY/4;
+        ctx.strokeRect(GOFFX + g*GRID_SHIFT_X + (V_COL - 1)*DX_SHIFT, GOFFY + (V_ROW - 1)*DY_SHIFT, DX, DY);
+        ctx.fillText('V', GOFFX + g*GRID_SHIFT_X + (V_COL - 1)*DX_SHIFT + TX, GOFFY + (V_ROW - 1)*DY_SHIFT + TY);
+
+        if (vmarks[g] == 1) {
+          ctx.strokeStyle = CMARK;
+          ctx.beginPath();
+          ctx.moveTo(GOFFX + g*GRID_SHIFT_X + (V_COL - 1)*DX_SHIFT + 4,      GOFFY + (V_ROW - 1)*DY_SHIFT + 4);
+          ctx.lineTo(GOFFX + g*GRID_SHIFT_X + (V_COL - 1)*DX_SHIFT + DX - 4, GOFFY + (V_ROW - 1)*DY_SHIFT + DY - 4);
+          // ctx.stroke();
+          // ctx.beginPath();
+          ctx.moveTo(GOFFX + g*GRID_SHIFT_X + (V_COL - 1)*DX_SHIFT + DX - 4, GOFFY + (V_ROW - 1)*DY_SHIFT + 4);
+          ctx.lineTo(GOFFX + g*GRID_SHIFT_X + (V_COL - 1)*DX_SHIFT + 4,      GOFFY + (V_ROW - 1)*DY_SHIFT + DY - 4);
+          ctx.stroke();
+        }
+      }
+
+      // ----------------
+      // draw crosses too
+      // ----------------
+      function drawCoupon(context) {
+        for (var g=1; g<=GRIDS; g++) {
+          drawNthGrid(context, g);
+        }
+      }
+
+      // -----------------------------
+      // returns: {grid:, :number} wehre
+      //   grid (1..10)
+      //   number (1..NUMS), OR
+      //   QP_ID if QuickPick selected
+      //   V_ID if VOID selected
+      // -----------------------------
+      function whichGridAndNumber(x, y) {
+        hres = {};
+        x -= GOFFX;
+        y -= GOFFY;
+        g = Math.floor(x/GRID_SHIFT_X) + 1;
+        g = (g > GRIDS) ? 0 : g;
+        hres.grid = g;
+
+        var dx = x - (g-1)*GRID_SHIFT_X;
+        var c  = Math.min(Math.floor(dx/DX_SHIFT) + 1, COLS);
+
+        if ((c-1)*DX_SHIFT + IN_X < dx && (c-1)*DX_SHIFT + DX - IN_X > dx) {
+          var r = Math.min(Math.floor(y/DY_SHIFT) + 1, QP_ROW);
+          if ((r-1)*DY_SHIFT + IN_Y < y && (r-1)*DY_SHIFT + DY - IN_Y > y) {
+            hres.number = (r-1)*COLS + c;
+            hres.number = (hres.number > NUMS) ? 0 : hres.number;
+            if (r == QP_ROW && c == QP_COL) { 
+              hres.number = QP_ID;
+            } else if (r == V_ROW && c == V_COL) { 
+              hres.number = V_ID;
+            }
+          } 
+        }
+        return hres;
+      }
+
+      // ----------------------------------------------- 
+      // returns {is_ok:, columns:, message:, numbers:}
+      // -----------------------------------------------
+      function checkGrid(grid) {
+        var m = countMarks(grid);
+        var numbers = [];
+
+        for (var i=0; i<NUMS; i++) { 
+          if (gnumbers[grid-1][i] == 1) {
+            numbers[numbers.length] = i+1; 
+          }
+        }
+
+        if (m.count == 0) {
+          return {is_ok: true, columns: 0, numbers: numbers, message: "VOID"};
+        }
+        if (m.count < SIMPLE) {
+          return {is_ok: false, numbers: numbers, message: "less marks than " + SIMPLE};
+        }
+        if (m.count <= SLIMIT) {
+          return {is_ok: true, columns: combin(numbers.length, SIMPLE), 
+            numbers: numbers, message: (numbers.length == SIMPLE ? "SIMPLE" : "SYSTEM")};
+        }
+
+        return {is_ok: false, numbers: numbers, message: "more marks than the limit " + SLIMIT};
+      }
+
+      // ----------------------------------------
+      // generate random array of k elements from
+      // a set of numbers 1..NUMS
+      // ----------------------------------------
+      function genQuickPick(k) {
+        array = new Array(NUMS);
+        result = [];
+        for (var i=0; i < NUMS; i++) { array[i] = i+1; }
+        for (var i=0; i < k; i++) {
+          var r    = Math.floor(Math.random() * array.length);
+          result[result.length] = array.splice(r, 1)[0];
+        }
+        return result.sort(function(a, b) { return a-b;});
+      }   
+
+      // ----------------------------
+      // Reset sepcific grid g: 1..10
+      // including QP and V marks
+      // ----------------------------
+      function resetGrid(g) {
+        for (var i=0; i < NUMS; i++) { gnumbers[g - 1][i] = 0; }
+        qpicks[g - 1] = 0;
+        vmarks[g - 1] = 0;
+      }
+
+      // -------------------------------------------
+      // Counts marked/played numbers where
+      // g = 1..10, returns {count:, last_mark_index:}
+      // -------------------------------------------
+      function countMarks(g) {
+        var count = 0;
+        var index = -1;
+        g -= 1;
+        for (var i=0; i < NUMS; i++) { 
+          count += gnumbers[g][i]; 
+          index  = gnumbers[g][i] > 0 ? i : index; 
+        }
+        return {count: count, last_mark_index: index};
+      }
+
+      // ---------------------------------------------------
+      // Calculate combin set size = n, combination size = k
+      // ---------------------------------------------------
+      function combin(n, k) {
+        // c = n!/(k! * (n-k)!) = n*(n-1) .. (n - k + 1)/ 1 * 2 .. k 
+        var p = 1;
+        k = Math.min(k, n - k);
+        for (var i=1; i <= k; i++) { p *= (n - i + 1); p /= i; }
+        return p;
+      }
+    </script>
+    <style type"text/css" media="screen">
+      table {font-family: "Sans Serif"; border-collapse: collapse; border: 1px solid black;}
+      th, td { border: 1px dotted black; }
+    </style>
+  </head>
+  <body onload="drawCanvas();">
+    <canvas id="the-canvas" onmousedown="doSomething(event, this)" width="800" height="400">
+    </canvas>
+    <table>
+      <tr>
+        <th></th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+      </tr>
+      <tr>
+        <td>Status</td><td><span id="status1"></span></td><td><span id="status2"></span></td>
+        <td><span id="status3"></span></td><td><span id="status4"></span></td>
+        <td><span id="status5"></span></td><td><span id="status6"></span></td>
+        <td><span id="status7"></span></td><td><span id="status8"></span></td>
+        <td><span id="status9"></span></td><td><span id="status10"></span></td>
+      </tr>
+      <tr>
+        <td>Columns</td><td><span id="columns1"></span></td><td><span id="columns2"></span></td>
+        <td><span id="columns3"></span></td><td><span id="columns4"></span></td>
+        <td><span id="columns5"></span></td><td><span id="columns6"></span></td>
+        <td><span id="columns7"></span></td><td><span id="columns8"></span></td>
+        <td><span id="columns9"></span></td><td><span id="columns10"></span></td>
+      </tr>
+      <tr><small>
+        <td>Numbers</td><td><span id="numbers1"></span></td><td><span id="numbers2"></span></td>
+        <td><span id="numbers3"></span></td><td><span id="numbers4"></span></td>
+        <td><span id="numbers5"></span></td><td><span id="numbers6"></span></td>
+        <td><span id="numbers7"></span></td><td><span id="numbers8"></span></td>
+        <td><span id="numbers9"></span></td><td><span id="numbers10"></span></td>
+      </small>
+      </tr>
+      <tr>
+        <td>Message</td><td><span id="message1"></span></td><td><span id="message2"></span></td>
+        <td><span id="message3"></span></td><td><span id="message4"></span></td>
+        <td><span id="message5"></span></td><td><span id="message6"></span></td>
+        <td><span id="message7"></span></td><td><span id="message8"></span></td>
+        <td><span id="message9"></span></td><td><span id="message10"></span></td>
+      </tr>
+    </table>
+  </body>
+</html>
